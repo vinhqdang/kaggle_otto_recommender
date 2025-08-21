@@ -14,6 +14,7 @@ import sys
 import time
 import logging
 import json
+import gc
 from pathlib import Path
 import pandas as pd
 
@@ -78,9 +79,15 @@ def prepare_test_data_streaming(test_loader: StreamingDataLoader, split_ratio: f
             
             if processed_sessions % 10000 == 0:
                 logger.info(f"Processed {processed_sessions} test sessions")
+                # Force garbage collection every 10k sessions to free memory
+                gc.collect()
     
     test_input_df = pd.concat(test_inputs, ignore_index=True) if test_inputs else pd.DataFrame()
     logger.info(f"Prepared {len(test_ground_truth)} sessions for evaluation")
+    
+    # Clean up temporary lists to free memory
+    del test_inputs
+    gc.collect()
     
     return test_input_df, test_ground_truth
 
@@ -105,6 +112,10 @@ def train_model_with_streaming(model, model_name: str, train_loader: StreamingDa
     training_time = time.time() - start_time
     
     logger.info(f"{model_name} training completed in {training_time:.2f} seconds")
+    
+    # Clean up training data to free memory
+    del train_events
+    gc.collect()
     
     return training_time
 
@@ -229,6 +240,10 @@ def main():
                 evaluator.print_evaluation_results(results, model_name)
                 logger.info(f"Training sessions used: {results['train_sessions_used']}")
                 logger.info(f"Test sessions evaluated: {results['test_sessions_evaluated']}")
+                
+                # Clean up model-specific data to free memory after each model
+                del predictions, multi_predictions
+                gc.collect()
                 
             except Exception as e:
                 logger.error(f"Error with {model_name}: {e}")

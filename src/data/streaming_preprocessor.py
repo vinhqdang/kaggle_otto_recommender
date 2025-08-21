@@ -4,6 +4,7 @@ import numpy as np
 from pathlib import Path
 import random
 import logging
+import gc
 from typing import Dict, List, Tuple, Optional
 import os
 
@@ -109,12 +110,14 @@ class StreamingOTTOProcessor:
                         self.session_counts[split] += 1
                         self.event_counts[split] += len(session_data['events'])
                         
-                        # Progress logging
+                        # Progress logging with memory cleanup
                         if line_idx % 100000 == 0:
                             logger.info(f"Processed {line_idx} sessions. "
                                       f"Train: {self.session_counts['train']}, "
                                       f"Val: {self.session_counts['val']}, "
                                       f"Test: {self.session_counts['test']}")
+                            # Force garbage collection every 100k sessions to prevent memory buildup
+                            gc.collect()
                         
                     except Exception as e:
                         logger.error(f"Error parsing line {line_idx}: {e}")
@@ -178,6 +181,8 @@ class StreamingDataLoader:
                         df = pd.DataFrame(events)
                         events = []  # Clear for next chunk
                         yield df
+                        # Force garbage collection after yielding chunk to free memory
+                        gc.collect()
                         
                 except Exception as e:
                     logger.error(f"Error parsing line {line_idx}: {e}")
@@ -213,6 +218,8 @@ class StreamingDataLoader:
                     
                     if line_idx % 10000 == 0:
                         logger.info(f"Loaded {sessions_loaded} sessions, {len(events)} events")
+                        # Force garbage collection periodically during loading
+                        gc.collect()
                         
                 except Exception as e:
                     logger.error(f"Error parsing line {line_idx}: {e}")

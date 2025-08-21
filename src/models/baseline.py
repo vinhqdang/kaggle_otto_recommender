@@ -3,6 +3,7 @@ import numpy as np
 from typing import Dict, List, Optional, Tuple
 from collections import defaultdict
 import logging
+import gc
 from sklearn.metrics.pairwise import cosine_similarity
 from scipy.sparse import csr_matrix
 
@@ -44,6 +45,10 @@ class PopularityRecommender:
             self.type_popularity[interaction_type] = popularity
         
         logger.info(f"Popularity model trained with {len(self.global_popularity)} items")
+        
+        # Clean up temporary data structures to free memory
+        del train_events
+        gc.collect()
     
     def predict(self, session_events: pd.DataFrame) -> List[int]:
         """Predict next items for a session."""
@@ -74,9 +79,15 @@ class PopularityRecommender:
     def predict_batch(self, test_events: pd.DataFrame) -> Dict[int, List[int]]:
         """Predict for multiple sessions."""
         predictions = {}
+        processed_sessions = 0
         
         for session_id, session_events in test_events.groupby('session'):
             predictions[session_id] = self.predict(session_events)
+            processed_sessions += 1
+            
+            # Force garbage collection every 1000 sessions to prevent memory buildup
+            if processed_sessions % 1000 == 0:
+                gc.collect()
         
         return predictions
 
@@ -127,6 +138,10 @@ class SessionBasedRecommender:
         )
         
         logger.info(f"Session-based model trained with {len(self.item_cooccurrence)} items")
+        
+        # Clean up temporary data structures to free memory
+        del train_events, session_items
+        gc.collect()
     
     def predict(self, session_events: pd.DataFrame) -> List[int]:
         """Predict next items for a session."""
@@ -175,9 +190,15 @@ class SessionBasedRecommender:
     def predict_batch(self, test_events: pd.DataFrame) -> Dict[int, List[int]]:
         """Predict for multiple sessions."""
         predictions = {}
+        processed_sessions = 0
         
         for session_id, session_events in test_events.groupby('session'):
             predictions[session_id] = self.predict(session_events)
+            processed_sessions += 1
+            
+            # Force garbage collection every 1000 sessions to prevent memory buildup
+            if processed_sessions % 1000 == 0:
+                gc.collect()
         
         return predictions
 
@@ -200,6 +221,10 @@ class HybridRecommender:
         self.session_model.fit(train_events)
         
         logger.info("Hybrid model training completed")
+        
+        # Clean up training data to free memory
+        del train_events
+        gc.collect()
     
     def predict(self, session_events: pd.DataFrame) -> List[int]:
         """Predict using hybrid approach."""
@@ -237,8 +262,14 @@ class HybridRecommender:
     def predict_batch(self, test_events: pd.DataFrame) -> Dict[int, List[int]]:
         """Predict for multiple sessions."""
         predictions = {}
+        processed_sessions = 0
         
         for session_id, session_events in test_events.groupby('session'):
             predictions[session_id] = self.predict(session_events)
+            processed_sessions += 1
+            
+            # Force garbage collection every 1000 sessions to prevent memory buildup
+            if processed_sessions % 1000 == 0:
+                gc.collect()
         
         return predictions
